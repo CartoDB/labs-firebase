@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>CartoDB + Firebase</title>
+    <meta charset="UTF-8">
+    <meta name="description" content="">
+    <meta name="keywords" content="">
+    <meta name="author" content="CartoDB">
+    <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="https://cartodb-libs.global.ssl.fastly.net/cartodb.js/v3/themes/css/cartodb.css">
+    <style>
+      html, body, #map-canvas {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map-canvas"></div>
+    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD_Q-N5CON3h1CcjKN_yOkHJYuOLEuggXI"></script>
+    <script type="text/javascript" src="https://cartodb-libs.global.ssl.fastly.net/cartodb.js/v3/cartodb.js"></script>
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.3.min.js"></script>
+    <script src="https://cdn.firebase.com/js/client/2.1.2/firebase.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.7.0/underscore-min.js"></script>
+    <script src="./transitSystems.js"></script>
+    <script type="text/javascript">
+      (function () {
+    
+        var map, buses, ref, name, mapOptions, f, system;
+        buses = {};
+        ref = new Firebase("https://publicdata-transit.firebaseio.com/");
+        system = 3;//Number($("#system").val());
+        name = transitSystems[system].tag;
+        mapOptions = {
+          center: new google.maps.LatLng(
+            transitSystems[system].lat,
+            transitSystems[system].lon
+          ),
+          zoom: transitSystems[system].zoom || 8,
+          mapTypeId: google.maps.MapTypeId.ROADMAP
+        };
+        map = new google.maps.Map(document.getElementById("map-canvas"), mapOptions);
+
+        f = ref.child(name + "/vehicles");
+        f.once("value", function (s) {
+          s.forEach(function (b) {
+            newBus(b.val(), b.key());
+          });
+        });
+        f.on("child_changed", function (s) {
+          var busMarker = buses[s.key()];
+          if (typeof busMarker === "undefined") {
+            newBus(s.val(), s.key());
+          } else {
+            busMarker.animatedMoveTo(s.val().lat, s.val().lon);
+          }
+        });
+        f.on("child_removed", function (s) {
+          var busMarker = buses[s.key()];
+          if (typeof busMarker !== "undefined") {
+            busMarker.setMap(null);
+            delete buses[s.key()];
+          }
+        });
+
+        function newBus(bus, firebaseId) {
+          var busLatLng, tag, marker;
+          busLatLng = new google.maps.LatLng(bus.lat, bus.lon);
+          tag = bus.routeTag.toString()[0].toUpperCase() + bus.routeTag.toString().slice(1);
+          marker = new google.maps.Marker({
+            icon: "http://chart.googleapis.com/chart?chst=d_bubble_icon_text_small&chld=bus|bbT|" + tag + "|7094FF|eee",
+            position: busLatLng,
+            map: map
+          });
+          buses[firebaseId] = marker;
+        }
+
+        function feq(f1, f2) {
+          return (Math.abs(f1 - f2) < 0.000001);
+        }
+
+        google.maps.Marker.prototype.animatedMoveTo = function (toLat, toLng) {
+          var fromLat, fromLng, frames, percent, curLat, curLng, move;
+          fromLat = this.getPosition().lat();
+          fromLng = this.getPosition().lng();
+          if (feq(fromLat, toLat) && feq(fromLng, toLng)) {
+            return;
+          }
+          frames = [];
+          for (percent = 0; percent < 1; percent += 0.005) {
+            curLat = fromLat + percent * (toLat - fromLat);
+            curLng = fromLng + percent * (toLng - fromLng);
+            frames.push(new google.maps.LatLng(curLat, curLng));
+          }
+          move = function (marker, latlngs, index, wait) {
+            marker.setPosition(latlngs[index]);
+            if (index !== latlngs.length - 1) {
+              setTimeout(function () {
+                move(marker, latlngs, index + 1, wait);
+              }, wait);
+            }
+          };
+          move(this, frames, 0, 25);
+        };
+      }());
+    </script>
+  </body>
+</html>

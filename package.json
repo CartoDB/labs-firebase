@@ -1,0 +1,20 @@
+{
+  "name": "cartodb-firebase",
+  "version": "0.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "CartoDB (https://github.com/CartoDB)",
+  "license": "ISC",
+  "dependencies": {
+    "connect": "^3.3.4",
+    "serve-static": "^1.8.1",
+    "firebase": "^2.1.2",
+    "step": "0.0.5",
+    "curlrequest": "^0.5.1",
+    "underscore": "^1.7.0",
+    "underscore.string": "^3.0.3"
+  }
+}
