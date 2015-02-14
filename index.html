@@ -31,7 +31,7 @@
         var map, buses, ref, name, mapOptions, f, system;
         buses = {};
         ref = new Firebase("https://publicdata-transit.firebaseio.com/");
-        system = 3;//Number($("#system").val());
+        system = 0;//Number($("#system").val());
         name = transitSystems[system].tag;
         mapOptions = {
           center: new google.maps.LatLng(
