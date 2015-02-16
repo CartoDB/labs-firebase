@@ -27,11 +27,11 @@
     <script src="./transitSystems.js"></script>
     <script type="text/javascript">
       (function () {
-    
-        var map, buses, ref, name, mapOptions, f, system;
+        var track = [6203, 8402, 8608, 8146, 5492];
+        var map, buses, ref, name, mapOptions, f, system, paths;
         buses = {};
         ref = new Firebase("https://publicdata-transit.firebaseio.com/");
-        system = 0;//Number($("#system").val());
+        system = 0;
         name = transitSystems[system].tag;
         mapOptions = {
           center: new google.maps.LatLng(
@@ -43,16 +43,41 @@
         };
         map = new google.maps.Map(document.getElementById("map-canvas"), mapOptions);
 
+        var sublayers = [];
+        _.each(track, function (t) {
+          sublayers.push({
+            sql: "select * FROM sf_muni_paths where id = " + t,
+            cartocss: "#sf_muni_paths {line-color: #"
+                + "000"//(Math.floor(Math.random()*16777215).toString(16))
+                + ";line-width: 3;line-opacity:0.7;}",
+            id: t
+          });
+        });
+
+        cartodb.createLayer(map, {
+          user_name: 'sanderpick',
+          type: 'cartodb',
+          sublayers: sublayers
+        }, {})
+        .addTo(map)
+        .done(function (layer) {
+          paths = layer;
+        });
+
         f = ref.child(name + "/vehicles");
         f.once("value", function (s) {
           s.forEach(function (b) {
-            newBus(b.val(), b.key());
+            if (track.indexOf(b.val().id) !== -1) {
+              newBus(b.val(), b.key());
+            }
           });
         });
         f.on("child_changed", function (s) {
           var busMarker = buses[s.key()];
           if (typeof busMarker === "undefined") {
-            newBus(s.val(), s.key());
+            if (track.indexOf(s.val().id) !== -1) {
+              newBus(s.val(), s.key());
+            }
           } else {
             busMarker.animatedMoveTo(s.val().lat, s.val().lon);
           }
@@ -70,9 +95,11 @@
           busLatLng = new google.maps.LatLng(bus.lat, bus.lon);
           tag = bus.routeTag.toString()[0].toUpperCase() + bus.routeTag.toString().slice(1);
           marker = new google.maps.Marker({
-            icon: "http://chart.googleapis.com/chart?chst=d_bubble_icon_text_small&chld=bus|bbT|" + tag + "|7094FF|eee",
+            icon: "http://chart.googleapis.com/chart?chst=d_bubble_icon_text_small&chld=bus|bbT|"
+                + tag + "|7094FF|eee",
             position: busLatLng,
-            map: map
+            map: map,
+            id: bus.id
           });
           buses[firebaseId] = marker;
         }
@@ -100,6 +127,12 @@
               setTimeout(function () {
                 move(marker, latlngs, index + 1, wait);
               }, wait);
+            } else {
+              var sql = _.find(paths.options.sublayers, function (l) {
+                return l.id === marker.id;
+              }).sql;
+              var path = paths.getSubLayer(track.indexOf(marker.id));
+              path.setSQL(sql);
             }
           };
           move(this, frames, 0, 25);
