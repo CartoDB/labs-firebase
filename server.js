@@ -39,13 +39,11 @@ function insertOrUpdate (b, cb) {
   Step(
     function () {
       var geom = "ST_SetSRID(ST_GeomFromGeoJSON('{\"type\":\"LineString\","
-          + "\"coordinates\":[[" + b.lon + "," + b.lat + "]]}'), 4326),";
-      var geom2 = "ST_SetSRID(ST_GeomFromGeoJSON('{\"type\":\"LineString\","
           + "\"coordinates\":[[" + b.lon + "," + b.lat + "," + b.timestamp
           + "]]}'), 4326)";
-      var vals = geom + geom2 + "," + b.speedKmHr + "," + b.secsSinceReport + ",'"
+      var vals = geom + "," + b.speedKmHr + "," + b.secsSinceReport + ",'"
           + b.routeTag + "'";
-      queue1.push("INSERT INTO sf_muni_paths (the_geom,spacetime,speedkmhr,"
+      queue1.push("INSERT INTO sf_muni_paths (spacetime,speedkmhr,"
           + "secssincereport,routetag,id) VALUES ("
           + vals + "," + b.id + ")", this);
     },
@@ -60,9 +58,9 @@ function insertOrUpdate (b, cb) {
       if (!update) {
         return this();
       }
-      var geom2 = "ST_Simplify(ST_AddPoint(spacetime, ST_SetSRID(ST_MakePoint("
+      var geom = "ST_Simplify(ST_AddPoint(spacetime, ST_SetSRID(ST_MakePoint("
           + b.lon + "," + b.lat + "," + b.timestamp + "),4326)),0.001)";
-      var vals = geom2 + "," + b.speedKmHr + "," + b.secsSinceReport + ",'"
+      var vals = geom + "," + b.speedKmHr + "," + b.secsSinceReport + ",'"
           + b.routeTag + "'";
       queue1.push("UPDATE sf_muni_paths SET (spacetime,speedkmhr,"
           + "secssincereport,routetag) = ("
@@ -80,9 +78,9 @@ f.on("value", function (s) {
   var hasBatchUpdate = false;
   var values = "";
   function _addToBatchUpdate(b) {
-    var geom2 = "ST_SetSRID(ST_MakePoint(" + b.lon
+    var geom = "ST_SetSRID(ST_MakePoint(" + b.lon
         + "," + b.lat + "," + b.timestamp + "),4326)";
-    var vals = b.id + "," + geom2 + "," + b.speedKmHr + "," + b.secsSinceReport
+    var vals = b.id + "," + geom + "," + b.speedKmHr + "," + b.secsSinceReport
         + ",'" + b.routeTag + "'";
     values += "(" + vals + "),";
   }

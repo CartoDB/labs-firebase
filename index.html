@@ -48,7 +48,9 @@
             user_name: 'sanderpick',
             type: 'cartodb',
             sublayers: [{
-              sql: "select * FROM sf_muni_paths where id = " + t,
+              sql: "select cartodb_id,id,routetag,speedkmhr,secssincereport,"
+                  + "ST_Transform(ST_Force_2D(spacetime),3857) as "
+                  + "the_geom_webmercator from sf_muni_paths where id = " + t,
               cartocss: "#sf_muni_paths {line-color: #"
                   + "000"//(Math.floor(Math.random()*16777215).toString(16))
                   + ";line-width: 3;line-opacity:0.7;}",
@@ -88,10 +90,11 @@
         function newBus(bus, firebaseId) {
           var busLatLng, tag, marker;
           busLatLng = new google.maps.LatLng(bus.lat, bus.lon);
-          tag = bus.routeTag.toString()[0].toUpperCase() + bus.routeTag.toString().slice(1);
+          tag = bus.routeTag.toString()[0].toUpperCase()
+              + bus.routeTag.toString().slice(1);
           marker = new google.maps.Marker({
-            icon: "http://chart.googleapis.com/chart?chst=d_bubble_icon_text_small&chld=bus|bbT|"
-                + tag + "|7094FF|eee",
+            icon: "http://chart.googleapis.com/chart?chst=d_bubble_icon_text_"
+                + "small&chld=bus|bbT|" + tag + "|7094FF|eee",
             position: busLatLng,
             map: map,
             id: bus.id
