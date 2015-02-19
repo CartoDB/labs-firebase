@@ -10,8 +10,10 @@ _.mixin(require('underscore.string'));
 var Firebase = new require('firebase');
 var ref = new Firebase('https://publicdata-transit.firebaseio.com/');
 var name = 'sf-muni';
-var track = {'5': null, '28': null, '8X': null, '18': null, '48': null,
-    '38L': null, '43': null, '9L': null, '71': null, '12': null};
+var interval = 20 * 1e3;
+var lastInsert;
+// var track = {'5': null, '28': null, '8X': null, '18': null, '48': null,
+//     '38L': null, '43': null, '9L': null, '71': null, '12': null};
 
 var queue1 = async.queue(post, 20); // parallel tasks
 // var queue2 = async.queue(post, 1); // ensure sync, avoid deadlocks
@@ -75,33 +77,44 @@ function post(q, cb) {
 
 f = ref.child(name + "/vehicles");
 f.on("value", function (s) {
+  var n = Date.now();
+  if (lastInsert && n - lastInsert < interval) {
+    util.log('Skipped update. Will take next in '
+        + Math.round(((interval - (n - lastInsert)) / 1e3)));
+    return;
+  }
+  lastInsert = n;
   var bs = s.val();
 
   var values = "";
   function _addToBatchInsert(b) {
-    var geom = "ST_SetSRID(ST_MakePoint(" + b.lon
-        + "," + b.lat + "),4326)";
+    var d = new Date(b.timestamp);
+    var ts = d.getUTCFullYear() + '-' + (d.getUTCMonth()+1)
+        + '-' + d.getUTCDate() + 'T' + d.getUTCHours() + ':'
+        + d.getUTCMinutes() + ':' + d.getUTCSeconds() + 'Z';
+    var geom = "ST_SetSRID(ST_MakePoint(" + b.lon + "," + b.lat + "),4326)";
     var vals = b.id + "," + geom + "," + b.speedKmHr + "," + b.secsSinceReport
-        + ",'" + b.routeTag + "'";
+        + ",'" + b.routeTag + "'," + b.heading + ",'" + b.dirTag
+        + "','" + b.vtype + "'," + b.predictable + ",TIMESTAMP '" + ts + "'";
     values += "(" + vals + "),";
   }
 
   _.each(bs, function (b) {
-    if (track[b.routeTag] === undefined) {
-      return;
-    }
-    if (track[b.routeTag] === b.id || track[b.routeTag] === null) {
-      track[b.routeTag] = b.id;
-      _addToBatchInsert(b);
-    }
+    // if (track[b.routeTag] === undefined) {
+    //   return;
+    // }
+    // if (track[b.routeTag] === b.id || track[b.routeTag] === null) {
+    //   track[b.routeTag] = b.id;
+    _addToBatchInsert(b);
+    // }
   });
 
   if (values[values.length - 1] === ',') {
     values = values.substr(0, values.length - 1);
   }
   values = "INSERT INTO sf_muni_points "
-      + "(id,the_geom,speedkmhr,secssincereport,routetag) VALUES "
-      + values;
+      + "(id,the_geom,speedkmhr,secssincereport,routetag,heading,dirtag,vtype"
+      + ",predictable,timestamp) VALUES " + values;
   queue1.push(values, function (err, data) {
     if (err) console.log(err);
   });
