@@ -79,8 +79,9 @@ f = ref.child(name + "/vehicles");
 f.on("value", function (s) {
   var n = Date.now();
   if (lastInsert && n - lastInsert < interval) {
-    util.log('Skipped update. Will take next in '
-        + Math.round(((interval - (n - lastInsert)) / 1e3)));
+    util.log('Skipped update. Ready for more in '
+        + Math.round(((interval - (n - lastInsert)) / 1e3)))
+        + ' seconds.';
     return;
   }
   lastInsert = n;
