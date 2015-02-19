@@ -10,30 +10,31 @@ _.mixin(require('underscore.string'));
 var Firebase = new require('firebase');
 var ref = new Firebase('https://publicdata-transit.firebaseio.com/');
 var name = 'sf-muni';
-var track = {'5': null, '28': null, '8X': null, '18': null, '48': null};
+var track = {'5': null, '28': null, '8X': null, '18': null, '48': null
+    '38L': null, '43': null, '9L': null, '71': null, '12': null};
 
-// var queue1 = async.queue(post, 20); // parallel tasks
+var queue1 = async.queue(post, 20); // parallel tasks
 // var queue2 = async.queue(post, 1); // ensure sync, avoid deadlocks
-// queue1.drain = function () {
-//   util.log(':::queue1 empty:::');
-// }
+queue1.drain = function () {
+  util.log(':::queue1 empty:::');
+}
 // queue2.drain = function () {
 //   util.log(':::queue2 empty:::');
 // }
 
-// function post(q, cb) {
-//   util.log(_.prune(q, 44));
-//   curl.request({
-//     url: 'https://sanderpick.cartodb.com/api/v2/sql',
-//     method: 'POST',
-//     data: {
-//       q: q,
-//       api_key: 'a3cd828920af200dd4610ad6364adbc3bd8ee09a'
-//     }
-//   }, function (err, data) {
-//     cb(err || JSON.parse(data === '' ? '{}': data).error, data);
-//   });
-// }
+function post(q, cb) {
+  util.log(_.prune(q, 44));
+  curl.request({
+    url: 'https://sanderpick.cartodb.com/api/v2/sql',
+    method: 'POST',
+    data: {
+      q: q,
+      api_key: 'a3cd828920af200dd4610ad6364adbc3bd8ee09a'
+    }
+  }, function (err, data) {
+    cb(err || JSON.parse(data === '' ? '{}': data).error, data);
+  });
+}
 
 // function insertOrUpdate (b, cb) {
 //   Step(
@@ -72,50 +73,39 @@ var track = {'5': null, '28': null, '8X': null, '18': null, '48': null};
 //   );
 // }
 
-// f = ref.child(name + "/vehicles");
-// f.on("value", function (s) {
-//   var bs = s.val();
-//   var hasBatchUpdate = false;
-//   var values = "";
-//   function _addToBatchUpdate(b) {
-//     var geom = "ST_SetSRID(ST_MakePoint(" + b.lon
-//         + "," + b.lat + "," + b.timestamp + "),4326)";
-//     var vals = b.id + "," + geom + "," + b.speedKmHr + "," + b.secsSinceReport
-//         + ",'" + b.routeTag + "'";
-//     values += "(" + vals + "),";
-//   }
+f = ref.child(name + "/vehicles");
+f.on("value", function (s) {
+  var bs = s.val();
 
-//   _.each(bs, function (b) {
-//     if (track[b.routeTag] === undefined) {
-//       return;
-//     }
-//     if (track[b.routeTag] === b.id) {
-//       _addToBatchUpdate(b);
-//       hasBatchUpdate = true;
-//     } else if (track[b.routeTag] === null) {
-//       track[b.routeTag] = b.id;
-//       insertOrUpdate(b, function (err, data) {
-//         if (err) return console.log(err);
-//       });
-//     }
-//   });
+  var values = "";
+  function _addToBatchInsert(b) {
+    var geom = "ST_SetSRID(ST_MakePoint(" + b.lon
+        + "," + b.lat + "),4326)";
+    var vals = b.id + "," + geom + "," + b.speedKmHr + "," + b.secsSinceReport
+        + ",'" + b.routeTag + "'";
+    values += "(" + vals + "),";
+  }
 
-//   if (hasBatchUpdate) {
-//     if (values[values.length - 1] === ',') {
-//       values = values.substr(0, values.length - 1);
-//     }
-//     values = "UPDATE sf_muni_paths "
-//         + "SET (spacetime,speedkmhr,secssincereport,routetag) = "
-//         + "(ST_Simplify(ST_AddPoint(spacetime,v.point),0.0001),v.speedkmhr,"
-//         + "v.secssincereport,v.routetag)"
-//         + " FROM (VALUES " + values
-//         + ") AS v(id,point,speedkmhr,secssincereport,routetag)"
-//         + " WHERE sf_muni_paths.id = v.id";
-//     queue2.push(values, function (err, data) {
-//       if (err) console.log(err);
-//     });
-//   }
-// });
+  _.each(bs, function (b) {
+    if (track[b.routeTag] === undefined) {
+      return;
+    }
+    if (track[b.routeTag] === b.id || track[b.routeTag] === null) {
+      track[b.routeTag] = b.id;
+      _addToBatchInsert(b);
+    }
+  });
+
+  if (values[values.length - 1] === ',') {
+    values = values.substr(0, values.length - 1);
+  }
+  values = "INSERT INTO sf_muni_points "
+      + "(id,the_geom,speedkmhr,secssincereport,routetag) VALUES "
+      + values;
+  queue1.push(values, function (err, data) {
+    if (err) console.log(err);
+  });
+});
 
 var connect = require('connect');
 var serveStatic = require('serve-static');
