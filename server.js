@@ -10,7 +10,7 @@ _.mixin(require('underscore.string'));
 var Firebase = new require('firebase');
 var ref = new Firebase('https://publicdata-transit.firebaseio.com/');
 var name = 'sf-muni';
-var track = {'5': null, '28': null, '8X': null, '18': null, '48': null
+var track = {'5': null, '28': null, '8X': null, '18': null, '48': null,
     '38L': null, '43': null, '9L': null, '71': null, '12': null};
 
 var queue1 = async.queue(post, 20); // parallel tasks
