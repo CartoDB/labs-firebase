@@ -14,68 +14,251 @@
         padding: 0;
         width: 100%;
         height: 100%;
+        font-family: 'Helvetica',Arial;
+        color: #333;
+        font-size: 13px;
+        line-height: 20px
+      }
+      #info {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+      }
+      .info {
+        position: relative;
+        margin-bottom: 15px;
+        width: 300px;
+        background: #fafafa;
+        -webkit-box-shadow: rgba(0, 0, 0, 0.2) 0 0 4px 2px;
+        -moz-box-shadow: rgba(0, 0, 0, 0.2) 0 0 4px 2px;
+        box-shadow: rgba(0, 0, 0, 0.2) 0 0 4px 2px;
+        background: white;
+        -webkit-border-radius: 4px;
+        -moz-border-radius: 4px;
+        -ms-border-radius: 4px;
+        -o-border-radius: 4px;
+        border-radius: 4px;
+        border: 1px solid #999;
+        text-align: left;
+        z-index: 106;
+      }
+      p {
+        color: #666;
+      }
+      p, .btn-group {
+        width: 100%;
+        padding: 10px;
+        -moz-box-sizing: border-box;
+        -webkit-box-sizing: border-box;
+        box-sizing: border-box;
+      }
+      .btn-group {
+        font-size: 0;
+        display: flex;
+      }
+      p span.val {
+        font-weight: bold;
+      }
+      .btn {
+        background: white;
+        border: 1px solid #ccc;
+        border-radius: 17px;
+        padding: 8px;
+        cursor: pointer;
+        outline: none;
+        flex-grow: 1;
+        font-size: 13px;
+        font-weight: bold;
+        text-align: center;
+        color: #999999;
+
+        -webkit-transition: all 0.1s ease-in-out;
+        -moz-transition: all 0.1s ease-in-out;
+        transition: all 0.1s ease-in-out;
+      }
+      .btn:last-child {
+        margin-left: 10px;
+      }
+      .btn:hover,.btn:active,.btn.active {
+        background: #333;
+        color: #fff;
+        border-color: #333;
       }
     </style>
   </head>
   <body>
+    <div id="info">
+      <div class="info">
+        <p>
+          <span id="timelabel">Last update</span>: <span class="val" id="time">...</span>
+          <br />
+          Miles traveled in last 24 hours: <span class="val" id="distance">...</span>
+        </p>
+      </div>
+      <div class="info">
+        <div class="btn-group">
+          <button id="replay" class="btn">Replay last 24 hours</button>
+          <button id="now" class="btn active">Now</button>
+        </div>
+      </div>
+    </div>
     <div id="map-canvas"></div>
-    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD_Q-N5CON3h1CcjKN_yOkHJYuOLEuggXI"></script>
-    <script type="text/javascript" src="https://cartodb-libs.global.ssl.fastly.net/cartodb.js/v3/cartodb.js"></script>
-    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.3.min.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD_Q-N5CON3h1CcjKN_yOkHJYuOLEuggXI"></script>
+    <script src="https://cartodb-libs.global.ssl.fastly.net/cartodb.js/v3/3.12/cartodb.uncompressed.js"></script>
     <script src="https://cdn.firebase.com/js/client/2.1.2/firebase.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.7.0/underscore-min.js"></script>
     <script src="./transitSystems.js"></script>
+    <script src="./date.js"></script>
     <script type="text/javascript">
       (function () {
-        // var track = [6203, 8402, 8608, 8146, 5492, 5513, 8199, 8455, 8619];
-        var track = [8448, 8143, 8102, 5516, 6205];
-        var map, buses, ref, name, mapOptions, f, system, paths;
-        buses = {};
-        ref = new Firebase("https://publicdata-transit.firebaseio.com/");
-        system = 0;
-        name = transitSystems[system].tag;
+        var map, mapOptions, f, cdbLayer, lastUpdate, lastUpdateInterval,
+            totalDistance, lastDistanceUpdate;
+        var lastDistanceInterval = 20 * 1e3;
+        var buses = {};
+        var ref = new Firebase("https://publicdata-transit.firebaseio.com/");
+        var system = 0;
+        var now = true;
+        var name = transitSystems[system].tag;
+        var styles = [{"featureType":"administrative","elementType":"all","stylers":[{"visibility":"on"},{"lightness":33}]},{"featureType":"landscape","elementType":"all","stylers":[{"color":"#f2e5d4"}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#c5dac6"}]},{"featureType":"poi.park","elementType":"labels","stylers":[{"visibility":"on"},{"lightness":20}]},{"featureType":"road","elementType":"all","stylers":[{"lightness":20}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#c5c6c6"}]},{"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#e4d7c6"}]},{"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#fbfaf7"}]},{"featureType":"water","elementType":"all","stylers":[{"visibility":"on"},{"color":"#acbcc9"}]}];
+        var styledMap = new google.maps.StyledMapType(styles,
+            {name: 'Default'});
         mapOptions = {
           center: new google.maps.LatLng(
             transitSystems[system].lat,
             transitSystems[system].lon
           ),
           zoom: transitSystems[system].zoom || 8,
-          mapTypeId: google.maps.MapTypeId.ROADMAP
+          streetViewControl: false,
+          panControl: false,
+          mapTypeControl: true,
+          mapTypeControlOptions: {
+            // style: google.maps.MapTypeControlStyle.DROPDOWN_MENU,
+            mapTypeIds: [
+              google.maps.MapTypeId.SATELLITE,
+              'default'
+            ],
+            position: google.maps.ControlPosition.RIGHT_BOTTOM
+          },
         };
         map = new google.maps.Map(document.getElementById("map-canvas"), mapOptions);
+        map.mapTypes.set('default', styledMap);
+        map.setMapTypeId('default');
 
-        _.each(track, function (t, i) {
-          cartodb.createLayer(map, {
-            user_name: 'sanderpick',
-            type: 'cartodb',
-            sublayers: [{
-              sql: "select cartodb_id,id,routetag,speedkmhr,secssincereport,"
-                  + "ST_Transform(ST_Force_2D(spacetime),3857) as "
-                  + "the_geom_webmercator from sf_muni_paths where id = " + t,
-              cartocss: "#sf_muni_paths {line-color: #"
-                  + "000"//(Math.floor(Math.random()*16777215).toString(16))
-                  + ";line-width: 3;line-opacity:0.7;}",
-              id: t
-            }]
-          })
-          .addTo(map, i)
-          .done(function (layer) {});
+        var sql = new cartodb.SQL({user: 'sanderpick',
+            api_key: 'a3cd828920af200dd4610ad6364adbc3bd8ee09a'});
+
+        cartodb.createLayer(map, {
+          type: 'torque',
+          user_name: 'sanderpick',
+          cartodb_logo: true,
+          order: 1,
+          options: {
+            query: "SELECT * FROM sf_muni_points",
+            tile_style: ' \
+              Map { \
+                -torque-frame-count:2048; \
+                -torque-animation-duration:120; \
+                -torque-time-attribute:"created_at"; \
+                -torque-aggregation-function:"CDB_Math_Mode(routeTag)"; \
+                -torque-resolution:1; \
+                -torque-data-aggregation:linear; \
+              } \
+              #sf_muni_points{ \
+                comp-op: source-over; \
+                marker-fill-opacity: 0.9; \
+                marker-line-color: #FFF; \
+                marker-line-width: 1; \
+                marker-line-opacity: 0.3; \
+                marker-type: rectangle; \
+                marker-width: 24; \
+                marker-fill: #FF9900; \
+                marker-file: url("https://s3.amazonaws.com/com.cartodb.users-assets.production/production/sanderpick/assets/20150220235014chart%3Fchst%3Dd_bubble_icon_text_small%26chld%3Dbus%7CbbT%7C%7C7094FF%7Ceee"); \
+              } \
+              #sf_muni_points[frame-offset=1] { \
+                marker-width:24; \
+                marker-fill-opacity:0.6; \
+              } \
+              #sf_muni_points[frame-offset=2] { \
+                marker-width:24; \
+                marker-fill-opacity:0.3; \
+              } \
+              '
+          }
+        })
+        .addTo(map, 0)
+        .done(function (_layer) {
+          cdbLayer = _layer;
+          // window.layer = _layer;
+          _.defer(function () {
+            var shader = _layer.renderer._shader;
+            
+            for (var i=0;i<300;++i) {
+              var url = 'http://chart.googleapis.com/chart?chst=d_bubble_icon_text_small&chld=bus|bbT|' + i + '|7094FF|eee';
+              shader.imageURLs.push(url);
+            }
+            _layer.renderer._preloadIcons(shader.getImageURLs());
+
+            shader.layers[1].shader['marker-file'].style =
+                function (data, ctx) {
+              var url = 'http://chart.googleapis.com/chart?chst=d_bubble_icon_text_small&chld=bus|bbT|' + data.value + '|7094FF|eee';
+              // shader.imageURLs.push(url);
+              // _layer.renderer._preloadIcons(shader.getImageURLs());
+              return url;
+            }
+          });
+
+          cdbLayer.pause()
+          cdbLayer.hide();
+          $('.cartodb-timeslider').hide();
+          $('#replay').click(function (e) {
+            $('#now').removeClass('active');
+            $('#replay').addClass('active');
+            now = false;
+            $('.cartodb-timeslider').show();
+            cdbLayer.show();
+            cdbLayer.play();
+            _.each(buses, function (m) {
+              m.setVisible(false);
+            });
+            $('#timelabel').text('Viewing');
+          });
+          $('#now').click(function (e) {
+            $('#replay').removeClass('active');
+            $('#now').addClass('active');
+            now = true;
+            cdbLayer.pause()
+            cdbLayer.hide();
+            cdbLayer.setStep(0);
+            $('.cartodb-timeslider').hide();
+            _.each(buses, function (m) {
+              m.setVisible(true);
+            });
+            $('#timelabel').text('Last update');
+          });
+
+          cdbLayer.on('change:time', function (changes) {
+            var ts = new Date(changes.time).valueOf();
+            $('#time').text(getRelativeTime(ts));
+          });
         });
 
         f = ref.child(name + "/vehicles");
         f.once("value", function (s) {
           s.forEach(function (b) {
-            if (track.indexOf(b.val().id) !== -1) {
-              newBus(b.val(), b.key());
-            }
+            newBus(b.val(), b.key());
           });
+        });
+        f.on("value", function (s) {
+          if (lastUpdateInterval) {
+            clearInterval(lastUpdateInterval);
+          }
+          lastUpdateInterval = setInterval(_.bind(updateTime, null, s), 5000);
+          updateTime(s);
+          getDistance();
         });
         f.on("child_changed", function (s) {
           var busMarker = buses[s.key()];
           if (typeof busMarker === "undefined") {
-            if (track.indexOf(s.val().id) !== -1) {
-              newBus(s.val(), s.key());
-            }
+            newBus(s.val(), s.key());
           } else {
             busMarker.animatedMoveTo(s.val().lat, s.val().lon);
           }
@@ -95,10 +278,11 @@
               + bus.routeTag.toString().slice(1);
           marker = new google.maps.Marker({
             icon: "http://chart.googleapis.com/chart?chst=d_bubble_icon_text_"
-                + "small&chld=bus|bbT|" + tag + "|7094FF|eee",
+                + "small&chld=bus|bbT|" + bus.id + "|7094FF|eee",
             position: busLatLng,
             map: map,
-            id: bus.id
+            id: bus.id,
+            visible: now
           });
           buses[firebaseId] = marker;
         }
@@ -126,15 +310,123 @@
               setTimeout(function () {
                 move(marker, latlngs, index + 1, wait);
               }, wait);
-            } else {
-              var layer = map.overlayMapTypes.getAt(track.indexOf(marker.id));
-              var sub = layer.getSubLayer(0);
-              sub.setSQL(sub.getSQL());
             }
           };
           move(this, frames, 0, 25);
         };
+
+        function updateTime (s) {
+          if (!now) {
+            return;
+          }
+          var ts = Number.MIN_VALUE;
+          s.forEach(function (b) {
+            var v = b.val();
+            if (v.timestamp > ts) {
+              ts = v.timestamp;
+            }
+          });
+          $('#time').text(getRelativeTime(ts));
+        }
+
+        function getDistance(opts) {
+          var n = Date.now();
+          if (lastDistanceUpdate && n - lastDistanceUpdate < lastDistanceInterval) {
+            return;
+          }
+          lastDistanceUpdate = n;
+          var q = "SELECT SUM(distance) FROM (SELECT ST_LENGTH(ST_MakeLine(the_geom_webmercator ORDER BY created_at ASC)) AS distance, id FROM sf_muni_points group by id) as distances"
+          sql.execute(q).done(function (data) {
+            var m = data.rows[0].sum;
+            $('#distance').text(addCommas(metersToMiles(m)));
+          }).error(function (err) {
+            console.log("errors:" + errors);
+          });
+        }
       }());
+
+      function getRelativeTime(ts) {
+        if ('number' === typeof ts)
+          ts = Math.round(ts);
+        var parsedDate = new Date(ts);
+        var relativeDate = arguments.length > 1 ? arguments[1] : new Date();
+        var delta;
+        if ('string' === typeof ts && ts.indexOf('T') === -1)
+          delta = (relativeDate.getTime() - (parsedDate.getTime()
+              + (getTimeZone() * 60 * 60 * 1000))) / 1e3;
+        else
+          delta = (relativeDate.getTime() - parsedDate.getTime()) / 1e3;
+        if (delta < 5) return 'just now';
+        else if (delta < 15) return 'just a moment ago';
+        else if (delta < 30) return 'just a few moments ago';
+        else if (delta < 60) return 'less than a minute ago';
+        else if (delta < 120) return 'about a minute ago';
+        else if (delta < (45 * 60))
+          return (parseInt(delta / 60)).toString() + ' minutes ago';
+        else if (delta < (90 * 60))
+          return 'about an hour ago';
+        else if (delta < (24 * 60 * 60)) {
+          var h = (parseInt(delta / 3600)).toString();
+          if (h != '1') return 'about ' + h + ' hours ago';
+          else return 'about an hour ago';
+        }
+        else if (delta < (2 * 24 * 60 * 60))
+          return 'about a day ago';
+        else if (delta < (10 * 24 * 60 * 60))
+          return (parseInt(delta / 86400)).toString() + ' days ago';
+        else return toLocaleString(new Date(ts), 'm/d/yy');
+      }
+
+      function getTimeZone() {
+        var rightNow = new Date();
+        var jan1 = new Date(rightNow.getFullYear(),
+                            0, 1, 0, 0, 0, 0);
+        var june1 = new Date(rightNow.getFullYear(),
+                            6, 1, 0, 0, 0, 0);
+        var temp = jan1.toGMTString();
+        var jan2 = new Date(temp.substring(0,
+                            temp.lastIndexOf(" ")-1));
+        temp = june1.toGMTString();
+        var june2 = new Date(temp.substring(0,
+                            temp.lastIndexOf(" ")-1));
+        var std_time_offset = (jan1 - jan2) / (1000 * 60 * 60);
+        var daylight_time_offset = (june1 - june2) /
+                                  (1000 * 60 * 60);
+        var dst;
+        if (std_time_offset == daylight_time_offset) {
+          // daylight savings time is NOT observed
+          dst = false;
+        } else {
+          // positive is southern, negative is northern hemisphere
+          var hemisphere = std_time_offset - daylight_time_offset;
+          if (hemisphere >= 0)
+            std_time_offset = daylight_time_offset;
+          // daylight savings time is observed
+          dst = true;
+        }
+        return dst ? std_time_offset + 1 : std_time_offset;
+      }
+
+      function toLocaleString (utcDate, mask) {
+        var time = utcDate.getTime();
+        var localDate = new Date(time);
+        return localDate.format(mask);
+      }
+
+      function metersToMiles(m) {
+        return (m * 0.000621371).toFixed(1);
+      }
+
+      function addCommas(str) {
+        str += '';
+        x = str.split('.');
+        x1 = x[0];
+        x2 = x.length > 1 ? '.' + x[1] : '';
+        var rgx = /(\d+)(\d{3})/;
+        while (rgx.test(x1))
+          x1 = x1.replace(rgx, '$1' + ',' + '$2');
+        return x1 + x2;
+      }
     </script>
   </body>
 </html>

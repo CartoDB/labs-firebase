@@ -34,7 +34,13 @@ function post(q, cb) {
       api_key: 'a3cd828920af200dd4610ad6364adbc3bd8ee09a'
     }
   }, function (err, data) {
-    cb(err || JSON.parse(data === '' ? '{}': data).error, data);
+    if (err) return cb(err);
+    try {
+      data = JSON.parse(data === '' ? '{}': data);
+      cb(data.error, data);
+    } catch (e) {
+      cb(data);
+    }
   });
 }
 
@@ -80,8 +86,8 @@ f.on("value", function (s) {
   var n = Date.now();
   if (lastInsert && n - lastInsert < interval) {
     util.log('Skipped update. Ready for more in '
-        + Math.round(((interval - (n - lastInsert)) / 1e3)))
-        + ' seconds.';
+        + Math.ceil(((interval - (n - lastInsert)) / 1e3))
+        + ' seconds.');
     return;
   }
   lastInsert = n;
@@ -124,3 +130,16 @@ f.on("value", function (s) {
 var connect = require('connect');
 var serveStatic = require('serve-static');
 connect().use(serveStatic(__dirname)).listen(5000);
+
+// CREATE OR REPLACE FUNCTION clearOld() RETURNS TRIGGER AS $$
+//     BEGIN
+//         DELETE FROM sf_muni_points WHERE created_at < now()-'1 day'::interval;
+//         RETURN NEW;
+//     END;
+// $$ language plpgsql;
+
+// CREATE TRIGGER clearOldOnInsert
+//     AFTER INSERT ON sf_muni_points
+//     FOR EACH STATEMENT
+//     WHEN (pg_trigger_depth() = 0)
+//     EXECUTE PROCEDURE clearOld();
