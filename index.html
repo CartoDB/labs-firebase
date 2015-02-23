@@ -26,7 +26,7 @@
       }
       .info {
         position: relative;
-        margin-bottom: 15px;
+        margin-bottom: 5px;
         width: 300px;
         background: #fafafa;
         -webkit-box-shadow: rgba(0, 0, 0, 0.2) 0 0 4px 2px;
@@ -92,7 +92,7 @@
         <p>
           <span id="timelabel">Last update</span>: <span class="val" id="time">...</span>
           <br />
-          Miles traveled in last 24 hours: <span class="val" id="distance">...</span>
+          Total miles in the last 24 hours: <span class="val" id="distance">...</span>
         </p>
       </div>
       <div class="info">
@@ -104,15 +104,16 @@
     </div>
     <div id="map-canvas"></div>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD_Q-N5CON3h1CcjKN_yOkHJYuOLEuggXI"></script>
-    <script src="https://cartodb-libs.global.ssl.fastly.net/cartodb.js/v3/3.12/cartodb.uncompressed.js"></script>
+    <script src="./cartodb.uncompressed.js"></script>
     <script src="https://cdn.firebase.com/js/client/2.1.2/firebase.js"></script>
     <script src="./transitSystems.js"></script>
     <script src="./date.js"></script>
     <script type="text/javascript">
       (function () {
         var map, mapOptions, f, cdbLayer, lastUpdate, lastUpdateInterval,
-            totalDistance, lastDistanceUpdate;
+            totalDistance, lastDistanceUpdate, lastUpdateText;
         var lastDistanceInterval = 20 * 1e3;
+        var routeTags = ["9", "48", "18", "KT", "2", "L", "17", "108", "N", "38", "76X", "55", "12", "52", "67", "23", "28", "71", "5", "43", "47", "3", "M", "31", "30", "35", "91", "22", "66", "21", "J", "8X", "60", "33", "K_OWL", "59", "37", "90", "14L", "24", "N_OWL", "19", "6", "L_OWL", "45", "49", "38L", "10", "36", "61", "27", "44", "29", "56", "39", "T_OWL", "F", "1", "54", "14", "M_OWL"];
         var buses = {};
         var ref = new Firebase("https://publicdata-transit.firebaseio.com/");
         var system = 0;
@@ -131,7 +132,6 @@
           panControl: false,
           mapTypeControl: true,
           mapTypeControlOptions: {
-            // style: google.maps.MapTypeControlStyle.DROPDOWN_MENU,
             mapTypeIds: [
               google.maps.MapTypeId.SATELLITE,
               'default'
@@ -142,6 +142,7 @@
         map = new google.maps.Map(document.getElementById("map-canvas"), mapOptions);
         map.mapTypes.set('default', styledMap);
         map.setMapTypeId('default');
+        var infowindow = new google.maps.InfoWindow({});
 
         var sql = new cartodb.SQL({user: 'sanderpick',
             api_key: 'a3cd828920af200dd4610ad6364adbc3bd8ee09a'});
@@ -156,55 +157,48 @@
             tile_style: ' \
               Map { \
                 -torque-frame-count:2048; \
-                -torque-animation-duration:120; \
+                -torque-animation-duration:300; \
                 -torque-time-attribute:"created_at"; \
-                -torque-aggregation-function:"CDB_Math_Mode(routeTag)"; \
+                -torque-aggregation-function:"CDB_Math_Mode(routetagid)"; \
                 -torque-resolution:1; \
                 -torque-data-aggregation:linear; \
+                -torque-loop:0; \
               } \
               #sf_muni_points{ \
                 comp-op: source-over; \
-                marker-fill-opacity: 0.9; \
-                marker-line-color: #FFF; \
-                marker-line-width: 1; \
-                marker-line-opacity: 0.3; \
+                marker-fill-opacity: 1; \
                 marker-type: rectangle; \
                 marker-width: 24; \
-                marker-fill: #FF9900; \
+                marker-fill: #000; \
                 marker-file: url("https://s3.amazonaws.com/com.cartodb.users-assets.production/production/sanderpick/assets/20150220235014chart%3Fchst%3Dd_bubble_icon_text_small%26chld%3Dbus%7CbbT%7C%7C7094FF%7Ceee"); \
               } \
-              #sf_muni_points[frame-offset=1] { \
-                marker-width:24; \
-                marker-fill-opacity:0.6; \
-              } \
-              #sf_muni_points[frame-offset=2] { \
-                marker-width:24; \
-                marker-fill-opacity:0.3; \
-              } \
-              '
+              ',
           }
         })
         .addTo(map, 0)
         .done(function (_layer) {
           cdbLayer = _layer;
-          // window.layer = _layer;
-          _.defer(function () {
+          _.delay(function () {
             var shader = _layer.renderer._shader;
-            
-            for (var i=0;i<300;++i) {
-              var url = 'http://chart.googleapis.com/chart?chst=d_bubble_icon_text_small&chld=bus|bbT|' + i + '|7094FF|eee';
+            routeTags.push('?');
+            _.each(routeTags, function (t) {
+              var url = 'http://chart.googleapis.com/chart?chst=d_bubble_icon_text_small&chld=bus|bbT|'
+                  + t + '|7094FF|eee';
               shader.imageURLs.push(url);
-            }
+            });
             _layer.renderer._preloadIcons(shader.getImageURLs());
-
             shader.layers[1].shader['marker-file'].style =
                 function (data, ctx) {
-              var url = 'http://chart.googleapis.com/chart?chst=d_bubble_icon_text_small&chld=bus|bbT|' + data.value + '|7094FF|eee';
-              // shader.imageURLs.push(url);
-              // _layer.renderer._preloadIcons(shader.getImageURLs());
+              var t = routeTags[data.value] || '?';
+              if (!t) {
+                console.log(data.value);
+              }
+              t = t[0].toUpperCase() + t.slice(1);
+              var url = 'http://chart.googleapis.com/chart?chst=d_bubble_icon_text_small&chld=bus|bbT|'
+                  + t + '|7094FF|eee';
               return url;
             }
-          });
+          }, 1000);
 
           cdbLayer.pause()
           cdbLayer.hide();
@@ -233,11 +227,15 @@
               m.setVisible(true);
             });
             $('#timelabel').text('Last update');
+            $('#time').text(lastUpdateText);
           });
 
           cdbLayer.on('change:time', function (changes) {
             var ts = new Date(changes.time).valueOf();
             $('#time').text(getRelativeTime(ts));
+            if (changes.step === 2047) {
+              $('#now').click();
+            }
           });
         });
 
@@ -278,11 +276,18 @@
               + bus.routeTag.toString().slice(1);
           marker = new google.maps.Marker({
             icon: "http://chart.googleapis.com/chart?chst=d_bubble_icon_text_"
-                + "small&chld=bus|bbT|" + bus.id + "|7094FF|eee",
+                + "small&chld=bus|bbT|" + tag + "|7094FF|eee",
             position: busLatLng,
             map: map,
             id: bus.id,
             visible: now
+          });
+
+          google.maps.event.addListener(marker, 'click', function () {
+            getDistance(bus.id, function (txt) {
+              infowindow.setContent(txt + ' miles in the last 24 hours');
+              infowindow.open(map, marker);
+            });
           });
           buses[firebaseId] = marker;
         }
@@ -316,9 +321,6 @@
         };
 
         function updateTime (s) {
-          if (!now) {
-            return;
-          }
           var ts = Number.MIN_VALUE;
           s.forEach(function (b) {
             var v = b.val();
@@ -326,19 +328,32 @@
               ts = v.timestamp;
             }
           });
-          $('#time').text(getRelativeTime(ts));
-        }
-
-        function getDistance(opts) {
-          var n = Date.now();
-          if (lastDistanceUpdate && n - lastDistanceUpdate < lastDistanceInterval) {
+          lastUpdateText = getRelativeTime(ts);
+          if (!now) {
             return;
           }
-          lastDistanceUpdate = n;
-          var q = "SELECT SUM(distance) FROM (SELECT ST_LENGTH(ST_MakeLine(the_geom_webmercator ORDER BY created_at ASC)) AS distance, id FROM sf_muni_points group by id) as distances"
+          $('#time').text(lastUpdateText);
+        }
+
+        function getDistance(id, cb) {
+          if (!id) {
+            var n = Date.now();
+            if (lastDistanceUpdate && n - lastDistanceUpdate < lastDistanceInterval) {
+              return;
+            }
+            lastDistanceUpdate = n;
+          }
+          var q = id ?
+              "SELECT ST_LENGTH(ST_MakeLine(the_geom_webmercator ORDER BY created_at ASC)) AS sum FROM sf_muni_points WHERE id = " + id: 
+              "SELECT SUM(distance) FROM (SELECT ST_LENGTH(ST_MakeLine(the_geom_webmercator ORDER BY created_at ASC)) AS distance, id FROM sf_muni_points group by id) as distances"
           sql.execute(q).done(function (data) {
-            var m = data.rows[0].sum;
-            $('#distance').text(addCommas(metersToMiles(m)));
+            if (id) {
+              var m = data.rows[0].sum;
+              cb(addCommas(metersToMiles(m)));
+            } else {
+              var m = data.rows[0].sum;
+              $('#distance').text(addCommas(metersToMiles(m)));
+            }
           }).error(function (err) {
             console.log("errors:" + errors);
           });
