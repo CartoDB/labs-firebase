@@ -27,7 +27,7 @@
       .info {
         position: relative;
         margin-bottom: 5px;
-        width: 300px;
+        width: 400px;
         background: #fafafa;
         -webkit-box-shadow: rgba(0, 0, 0, 0.2) 0 0 4px 2px;
         -moz-box-shadow: rgba(0, 0, 0, 0.2) 0 0 4px 2px;
@@ -42,10 +42,10 @@
         text-align: left;
         z-index: 106;
       }
-      p {
+      p:not(.value) {
         color: #666;
       }
-      p, .btn-group {
+      p:not(.value), .btn-group {
         width: 100%;
         padding: 10px;
         -moz-box-sizing: border-box;
@@ -71,18 +71,22 @@
         font-weight: bold;
         text-align: center;
         color: #999999;
+        margin-left: 10px;
 
         -webkit-transition: all 0.1s ease-in-out;
         -moz-transition: all 0.1s ease-in-out;
         transition: all 0.1s ease-in-out;
       }
-      .btn:last-child {
-        margin-left: 10px;
+      .btn:first-child {
+        margin-left: 0;
       }
       .btn:hover,.btn:active,.btn.active {
         background: #333;
         color: #fff;
         border-color: #333;
+      }
+      div.cartodb-timeslider p {
+        width: 120px;
       }
     </style>
   </head>
@@ -97,7 +101,8 @@
       </div>
       <div class="info">
         <div class="btn-group">
-          <button id="replay" class="btn">Replay last 24 hours</button>
+          <button id="replay" class="btn">Replay last day</button>
+          <button id="heat" class="btn">Replay last day w/heat</button>
           <button id="now" class="btn active">Now</button>
         </div>
       </div>
@@ -105,6 +110,7 @@
     <div id="map-canvas"></div>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD_Q-N5CON3h1CcjKN_yOkHJYuOLEuggXI"></script>
     <script src="./cartodb.uncompressed.js"></script>
+    <!-- script src="https://cartodb-libs.global.ssl.fastly.net/cartodb.js/v3/3.12/cartodb.js"></script -->
     <script src="https://cdn.firebase.com/js/client/2.1.2/firebase.js"></script>
     <script src="./transitSystems.js"></script>
     <script src="./date.js"></script>
@@ -112,14 +118,16 @@
       (function () {
         var map, mapOptions, f, cdbLayer, lastUpdate, lastUpdateInterval,
             totalDistance, lastDistanceUpdate, lastUpdateText;
+        var iconLayer, heatLayer;
+        var numSteps = 2047;
         var lastDistanceInterval = 20 * 1e3;
-        var routeTags = ["9", "48", "18", "KT", "2", "L", "17", "108", "N", "38", "76X", "55", "12", "52", "67", "23", "28", "71", "5", "43", "47", "3", "M", "31", "30", "35", "91", "22", "66", "21", "J", "8X", "60", "33", "K_OWL", "59", "37", "90", "14L", "24", "N_OWL", "19", "6", "L_OWL", "45", "49", "38L", "10", "36", "61", "27", "44", "29", "56", "39", "T_OWL", "F", "1", "54", "14", "M_OWL"];
+        var routeTags = ["9", "48", "18", "KT", "2", "L", "17", "108", "N", "38", "76X", "55", "12", "52", "67", "23", "28", "71", "5", "43", "47", "3", "M", "31", "30", "35", "91", "22", "66", "21", "J", "8X", "60", "33", "K_OWL", "59", "37", "90", "14L", "24", "N_OWL", "19", "6", "L_OWL", "45", "49", "38L", "10", "36", "61", "27", "44", "29", "56", "39", "T_OWL", "F", "1", "54", "14", "M_OWL", "?"];
         var buses = {};
         var ref = new Firebase("https://publicdata-transit.firebaseio.com/");
         var system = 0;
         var now = true;
         var name = transitSystems[system].tag;
-        var styles = [{"featureType":"administrative","elementType":"all","stylers":[{"visibility":"on"},{"lightness":33}]},{"featureType":"landscape","elementType":"all","stylers":[{"color":"#f2e5d4"}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#c5dac6"}]},{"featureType":"poi.park","elementType":"labels","stylers":[{"visibility":"on"},{"lightness":20}]},{"featureType":"road","elementType":"all","stylers":[{"lightness":20}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#c5c6c6"}]},{"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#e4d7c6"}]},{"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#fbfaf7"}]},{"featureType":"water","elementType":"all","stylers":[{"visibility":"on"},{"color":"#acbcc9"}]}];
+        var styles = [{"featureType":"landscape","stylers":[{"saturation":-100},{"lightness":65},{"visibility":"on"}]},{"featureType":"poi","stylers":[{"saturation":-100},{"lightness":51},{"visibility":"simplified"}]},{"featureType":"road.highway","stylers":[{"saturation":-100},{"visibility":"simplified"}]},{"featureType":"road.arterial","stylers":[{"saturation":-100},{"lightness":30},{"visibility":"on"}]},{"featureType":"road.local","stylers":[{"saturation":-100},{"lightness":40},{"visibility":"on"}]},{"featureType":"transit","stylers":[{"saturation":-100},{"visibility":"simplified"}]},{"featureType":"administrative.province","stylers":[{"visibility":"off"}]},{"featureType":"water","elementType":"labels","stylers":[{"visibility":"on"},{"lightness":-25},{"saturation":-100}]},{"featureType":"water","elementType":"geometry","stylers":[{"hue":"#ffff00"},{"lightness":-25},{"saturation":-97}]}];
         var styledMap = new google.maps.StyledMapType(styles,
             {name: 'Default'});
         mapOptions = {
@@ -147,46 +155,104 @@
         var sql = new cartodb.SQL({user: 'sanderpick',
             api_key: 'a3cd828920af200dd4610ad6364adbc3bd8ee09a'});
 
-        cartodb.createLayer(map, {
-          type: 'torque',
-          user_name: 'sanderpick',
-          cartodb_logo: true,
-          order: 1,
-          options: {
-            query: "SELECT * FROM sf_muni_points",
-            tile_style: ' \
-              Map { \
-                -torque-frame-count:2048; \
-                -torque-animation-duration:300; \
-                -torque-time-attribute:"created_at"; \
-                -torque-aggregation-function:"CDB_Math_Mode(routetagid)"; \
-                -torque-resolution:1; \
-                -torque-data-aggregation:linear; \
-                -torque-loop:0; \
-              } \
-              #sf_muni_points{ \
-                comp-op: source-over; \
-                marker-fill-opacity: 1; \
-                marker-type: rectangle; \
-                marker-width: 24; \
-                marker-fill: #000; \
-                marker-file: url("https://s3.amazonaws.com/com.cartodb.users-assets.production/production/sanderpick/assets/20150220235014chart%3Fchst%3Dd_bubble_icon_text_small%26chld%3Dbus%7CbbT%7C%7C7094FF%7Ceee"); \
-              } \
-              ',
+        var iconStyle = ' \
+            Map { \
+              -torque-frame-count:2048; \
+              -torque-animation-duration:300; \
+              -torque-time-attribute:"sf_time"; \
+              -torque-aggregation-function:"CDB_Math_Mode(routetagid)"; \
+              -torque-resolution:1; \
+              -torque-data-aggregation:linear; \
+            } \
+            #sf_muni_points{ \
+              comp-op: source-over; \
+              marker-fill-opacity: 1; \
+              marker-type: rectangle; \
+              marker-width: 24; \
+              marker-fill: #000; \
+              marker-file: url("https://s3.amazonaws.com/com.cartodb.users-assets.production/production/sanderpick/assets/20150220235014chart%3Fchst%3Dd_bubble_icon_text_small%26chld%3Dbus%7CbbT%7C%7C7094FF%7Ceee"); \
+            } \
+            ';
+        var heatStyle = ' \
+            Map { \
+            -torque-frame-count:1080; \
+            -torque-animation-duration:30; \
+            -torque-time-attribute:"sf_time"; \
+            -torque-aggregation-function:"count(cartodb_id)"; \
+            -torque-resolution:2; \
+            -torque-data-aggregation:linear; \
+            } \
+            #sf_muni_points{ \
+              comp-op: lighter; \
+              marker-fill-opacity: 0.9; \
+              marker-line-color: #FFF; \
+              marker-line-width: 0; \
+              marker-line-opacity: 1; \
+              marker-type: ellipse; \
+              marker-width: 0.5; \
+              marker-fill: #F84F40; \
+            } \
+            #sf_muni_points[frame-offset=1] { \
+             marker-width:2.5; \
+             marker-fill-opacity:0.45; \
+            } \
+            #sf_muni_points[frame-offset=2] { \
+             marker-width:3.5; \
+             marker-fill-opacity:0.225; \
+            } \
+            #sf_muni_points[frame-offset=3] { \
+             marker-width:4.5; \
+             marker-fill-opacity:0.15; \
+            } \
+            #sf_muni_points[frame-offset=4] { \
+             marker-width:5.5; \
+             marker-fill-opacity:0.1125; \
+            } \
+            #sf_muni_points[frame-offset=5] { \
+             marker-width:5.5; \
+             marker-fill-opacity:0.09; \
+            } \
+            #sf_muni_points[frame-offset=6] { \
+             marker-width:5.5; \
+             marker-fill-opacity:0.075; \
+            } \
+            #sf_muni_points[frame-offset=7] { \
+             marker-width:5.5; \
+             marker-fill-opacity:0.0642857142857143; \
+            } \
+            #sf_muni_points[frame-offset=8] { \
+             marker-width:5.5; \
+             marker-fill-opacity:0.05625; \
+            } \
+            #sf_muni_points[frame-offset=9] { \
+             marker-width:5.5; \
+             marker-fill-opacity:0.05; \
+            } \
+            #sf_muni_points[frame-offset=10] { \
+             marker-width:5.5; \
+             marker-fill-opacity:0.045; \
+            } \
+            ';
+
+        $('#replay').click(function (e) {
+          if ($('#replay').hasClass('active')) {
+            return;
           }
-        })
-        .addTo(map, 0)
-        .done(function (_layer) {
-          cdbLayer = _layer;
-          _.delay(function () {
-            var shader = _layer.renderer._shader;
-            routeTags.push('?');
+          if (iconLayer) {
+            $('#now').removeClass('active');
+            $('#heat').removeClass('active');
+            $('#replay').addClass('active');
+            now = false;
+            heat = false;
+            iconLayer.setCartoCSS(iconStyle);
+
+            var shader = iconLayer.renderer._shader;
             _.each(routeTags, function (t) {
               var url = 'http://chart.googleapis.com/chart?chst=d_bubble_icon_text_small&chld=bus|bbT|'
                   + t + '|7094FF|eee';
               shader.imageURLs.push(url);
             });
-            _layer.renderer._preloadIcons(shader.getImageURLs());
+            iconLayer.renderer._preloadIcons(shader.getImageURLs());
             shader.layers[1].shader['marker-file'].style =
                 function (data, ctx) {
               var t = routeTags[data.value] || '?';
@@ -198,45 +264,90 @@
                   + t + '|7094FF|eee';
               return url;
             }
-          }, 1000);
 
-          cdbLayer.pause()
-          cdbLayer.hide();
-          $('.cartodb-timeslider').hide();
-          $('#replay').click(function (e) {
-            $('#now').removeClass('active');
-            $('#replay').addClass('active');
-            now = false;
             $('.cartodb-timeslider').show();
-            cdbLayer.show();
-            cdbLayer.play();
+            numSteps = 2047;
+            iconLayer.show();
+            iconLayer.setStep(0);
+            iconLayer.play();
             _.each(buses, function (m) {
               m.setVisible(false);
             });
             $('#timelabel').text('Viewing');
-          });
-          $('#now').click(function (e) {
+          }
+        });
+        $('#heat').click(function (e) {
+          if ($('#heat').hasClass('active')) {
+            return;
+          }
+          if (iconLayer) {
+            $('#now').removeClass('active');
             $('#replay').removeClass('active');
-            $('#now').addClass('active');
-            now = true;
-            cdbLayer.pause()
-            cdbLayer.hide();
-            cdbLayer.setStep(0);
-            $('.cartodb-timeslider').hide();
+            $('#heat').addClass('active');
+            now = false;
+            heat = true;
+            iconLayer.setCartoCSS(heatStyle);
+            $('.cartodb-timeslider').show();
+            numSteps = 1079;
+            iconLayer.show();
+            iconLayer.setStep(0);
+            iconLayer.play();
             _.each(buses, function (m) {
-              m.setVisible(true);
+              m.setVisible(false);
             });
-            $('#timelabel').text('Last update');
-            $('#time').text(lastUpdateText);
+            $('#timelabel').text('Viewing');
+          }
+        });
+        $('#now').click(function (e) {
+          $('#replay').removeClass('active');
+          $('#heat').removeClass('active');
+          $('#now').addClass('active');
+          now = true;
+          heat = false;
+          if (iconLayer) {
+            iconLayer.pause();
+            iconLayer.hide();
+            iconLayer.setStep(0);
+          }
+          $('.cartodb-timeslider').hide();
+          _.each(buses, function (m) {
+            m.setVisible(true);
           });
+          $('#timelabel').text('Last update');
+          $('#time').text(lastUpdateText);
+        });
 
-          cdbLayer.on('change:time', function (changes) {
+        cartodb.createLayer(map, {
+          type: 'torque',
+          user_name: 'sanderpick',
+          cartodb_logo: true,
+          order: 1,
+          options: {
+            query: "SELECT *,(created_at-'8 hours'::interval) as sf_time FROM sf_muni_points",
+            tile_style: iconStyle,
+          }
+        })
+        .addTo(map, 0)
+        .done(function (_layer) {
+          iconLayer = _layer;
+          iconLayer.hide();
+          iconLayer.pause();
+          $('.cartodb-timeslider').hide();
+          iconLayer.on('change:time', function (changes) {
+            if (now) return;
             var ts = new Date(changes.time).valueOf();
             $('#time').text(getRelativeTime(ts));
-            if (changes.step === 2047) {
+            if (changes.step === numSteps) {
               $('#now').click();
             }
           });
+          $('.cartodb-timeslider .button').click(function (e) {
+            if ($('.cartodb-timeslider .button').hasClass('stop')) {
+              $('.cartodb-timeslider .button').removeClass('stop').addClass('play');
+            } else {
+              $('.cartodb-timeslider .button').addClass('stop').removeClass('play');
+            }
+          })
         });
 
         f = ref.child(name + "/vehicles");
@@ -370,7 +481,7 @@
           delta = (relativeDate.getTime() - (parsedDate.getTime()
               + (getTimeZone() * 60 * 60 * 1000))) / 1e3;
         else
-          delta = (relativeDate.getTime() - parsedDate.getTime()) / 1e3;
+          delta = (relativeDate.getTime() - parsedDate.getTime() - 8*3600*1000) / 1e3;
         if (delta < 5) return 'just now';
         else if (delta < 15) return 'just a moment ago';
         else if (delta < 30) return 'just a few moments ago';

@@ -41,7 +41,6 @@ var cancelAnimationFrame = global.cancelAnimationFrame
     }, this.options);
 
     this.rescale();
-
   }
 
 
@@ -4475,8 +4474,8 @@ var filters = require('./torque_filters');
       // take into account the exterior ring to calculate the size
       var canvasSize = (st['marker-line-width'] || 0) + pointSize*2;
       var ctx = canvas.getContext('2d');
-      // var w = ctx.width = canvas.width = ctx.height = canvas.height = Math.ceil(canvasSize);
-      // ctx.translate(w/2, w/2);
+      var w = ctx.width = canvas.width = ctx.height = canvas.height = Math.ceil(canvasSize);
+      
 
       function qualifyURL(url) {
             var a = document.createElement('a');
@@ -4491,12 +4490,12 @@ var filters = require('./torque_filters');
           img.h = img.height || st['marker-height'];
           ctx.width = canvas.width = img.w;
           ctx.height = canvas.height = img.h;
-          // st['marker-width'] = img.w;
-          // st['marker-height'] = img.h;
           ctx.translate(img.w/2, img.h/2);
           cartocss.renderSprite(ctx, img, st);
       } 
       else {
+        ctx.translate(w/2, w/2);
+        // ctx.restore();
         var mt = st['marker-type'];
         if (mt && mt === 'rectangle') {
           cartocss.renderRectangle(ctx, st);
