@@ -439,7 +439,11 @@
               ts = v.timestamp;
             }
           });
-          lastUpdateText = getRelativeTime(ts);
+          if (ts === Number.MIN_VALUE) {
+            lastUpdateText = 'Waiting for Firebase...';
+          } else {
+            lastUpdateText = getRelativeTime(ts);
+          }
           if (!now) {
             return;
           }
