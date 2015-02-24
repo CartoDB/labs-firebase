@@ -101,16 +101,16 @@
       </div>
       <div class="info">
         <div class="btn-group">
-          <button id="replay" class="btn">Replay last day</button>
-          <button id="heat" class="btn">Replay last day w/heat</button>
+          <!-- <button id="replay" class="btn">Replay last day</button> -->
+          <button id="heat" class="btn">Replay last 24 hours</button>
           <button id="now" class="btn active">Now</button>
         </div>
       </div>
     </div>
     <div id="map-canvas"></div>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD_Q-N5CON3h1CcjKN_yOkHJYuOLEuggXI"></script>
-    <script src="./cartodb.uncompressed.js"></script>
-    <!-- script src="https://cartodb-libs.global.ssl.fastly.net/cartodb.js/v3/3.12/cartodb.js"></script -->
+    <!-- script src="./cartodb.uncompressed.js"></script -->
+    <script src="https://cartodb-libs.global.ssl.fastly.net/cartodb.js/v3/3.12/cartodb.js"></script>
     <script src="https://cdn.firebase.com/js/client/2.1.2/firebase.js"></script>
     <script src="./transitSystems.js"></script>
     <script src="./date.js"></script>
@@ -324,7 +324,7 @@
           order: 1,
           options: {
             query: "SELECT *,(created_at-'8 hours'::interval) as sf_time FROM sf_muni_points",
-            tile_style: iconStyle,
+            tile_style: heatStyle,
           }
         })
         .addTo(map, 0)
