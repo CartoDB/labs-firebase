@@ -27,7 +27,7 @@
       .info {
         position: relative;
         margin-bottom: 5px;
-        width: 400px;
+        width: 300px;
         background: #fafafa;
         -webkit-box-shadow: rgba(0, 0, 0, 0.2) 0 0 4px 2px;
         -moz-box-shadow: rgba(0, 0, 0, 0.2) 0 0 4px 2px;
@@ -152,8 +152,7 @@
         map.setMapTypeId('default');
         var infowindow = new google.maps.InfoWindow({});
 
-        var sql = new cartodb.SQL({user: 'sanderpick',
-            api_key: 'a3cd828920af200dd4610ad6364adbc3bd8ee09a'});
+        var sql = new cartodb.SQL({user: 'sanderpick'});
 
         var iconStyle = ' \
             Map { \
