@@ -336,9 +336,9 @@
             if (now) return;
             var ts = new Date(changes.time).valueOf();
             $('#time').text(getRelativeTime(ts));
-            if (changes.step === numSteps) {
-              $('#now').click();
-            }
+            // if (changes.step === numSteps) {
+            //   $('#now').click();
+            // }
           });
           $('.cartodb-timeslider .button').click(function (e) {
             if ($('.cartodb-timeslider .button').hasClass('stop')) {
