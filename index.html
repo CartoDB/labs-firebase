@@ -54,6 +54,9 @@
       }
       .btn-group {
         font-size: 0;
+        display: -webkit-box;
+        display: -moz-box;
+        display: -ms-flexbox;
         display: flex;
       }
       p span.val {
@@ -66,7 +69,6 @@
         padding: 8px;
         cursor: pointer;
         outline: none;
-        flex-grow: 1;
         font-size: 13px;
         font-weight: bold;
         text-align: center;
@@ -76,6 +78,11 @@
         -webkit-transition: all 0.1s ease-in-out;
         -moz-transition: all 0.1s ease-in-out;
         transition: all 0.1s ease-in-out;
+
+        -webkit-flex-grow: 1;
+        -moz-flex-grow: 1;
+        -ms-flex-grow: 1;
+        flex-grow: 1;
       }
       .btn:first-child {
         margin-left: 0;
