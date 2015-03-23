@@ -44,50 +44,50 @@ function post(q, cb) {
   });
 }
 
-// f = ref.child(name + "/vehicles");
-// f.on("value", function (s) {
-//   var n = Date.now();
-//   if (lastInsert && n - lastInsert < interval) {
-//     util.log('Skipped update. Ready for more in '
-//         + Math.ceil(((interval - (n - lastInsert)) / 1e3))
-//         + ' seconds.');
-//     return;
-//   }
-//   lastInsert = n;
-//   var bs = s.val();
+f = ref.child(name + "/vehicles");
+f.on("value", function (s) {
+  var n = Date.now();
+  if (lastInsert && n - lastInsert < interval) {
+    util.log('Skipped update. Ready for more in '
+        + Math.ceil(((interval - (n - lastInsert)) / 1e3))
+        + ' seconds.');
+    return;
+  }
+  lastInsert = n;
+  var bs = s.val();
 
-//   var values = "";
-//   function _addToBatchInsert(b) {
-//     var routeTagId = routeTags.indexOf(b.routeTag);
-//     if (routeTagId === -1) {
-//       return;
-//     }
-//     var d = new Date(b.timestamp);
-//     var ts = d.getUTCFullYear() + '-' + (d.getUTCMonth()+1)
-//         + '-' + d.getUTCDate() + 'T' + d.getUTCHours() + ':'
-//         + d.getUTCMinutes() + ':' + d.getUTCSeconds() + 'Z';
-//     var geom = "ST_SetSRID(ST_MakePoint(" + b.lon + "," + b.lat + "),4326)";
-//     var vals = b.id + "," + geom + "," + b.speedKmHr + "," + b.secsSinceReport
-//         + ",'" + b.routeTag + "'," + b.heading + ",'" + b.dirTag
-//         + "','" + b.vtype + "'," + b.predictable + ",TIMESTAMP '" + ts + "',"
-//         + routeTagId;
-//     values += "(" + vals + "),";
-//   }
+  var values = "";
+  function _addToBatchInsert(b) {
+    var routeTagId = routeTags.indexOf(b.routeTag);
+    if (routeTagId === -1) {
+      return;
+    }
+    var d = new Date(b.timestamp);
+    var ts = d.getUTCFullYear() + '-' + (d.getUTCMonth()+1)
+        + '-' + d.getUTCDate() + 'T' + d.getUTCHours() + ':'
+        + d.getUTCMinutes() + ':' + d.getUTCSeconds() + 'Z';
+    var geom = "ST_SetSRID(ST_MakePoint(" + b.lon + "," + b.lat + "),4326)";
+    var vals = b.id + "," + geom + "," + b.speedKmHr + "," + b.secsSinceReport
+        + ",'" + b.routeTag + "'," + b.heading + ",'" + b.dirTag
+        + "','" + b.vtype + "'," + b.predictable + ",TIMESTAMP '" + ts + "',"
+        + routeTagId;
+    values += "(" + vals + "),";
+  }
 
-//   _.each(bs, function (b) {
-//     _addToBatchInsert(b);
-//   });
+  _.each(bs, function (b) {
+    _addToBatchInsert(b);
+  });
 
-//   if (values[values.length - 1] === ',') {
-//     values = values.substr(0, values.length - 1);
-//   }
-//   values = "INSERT INTO sf_muni_points "
-//       + "(id,the_geom,speedkmhr,secssincereport,routetag,heading,dirtag,vtype"
-//       + ",predictable,timestamp,routetagid) VALUES " + values;
-//   queue1.push(values, function (err, data) {
-//     if (err) console.log(err);
-//   });
-// });
+  if (values[values.length - 1] === ',') {
+    values = values.substr(0, values.length - 1);
+  }
+  values = "INSERT INTO sf_muni_points "
+      + "(id,the_geom,speedkmhr,secssincereport,routetag,heading,dirtag,vtype"
+      + ",predictable,timestamp,routetagid) VALUES " + values;
+  queue1.push(values, function (err, data) {
+    if (err) console.log(err);
+  });
+});
 
 var connect = require('connect');
 var serveStatic = require('serve-static');
