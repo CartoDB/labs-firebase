@@ -109,8 +109,8 @@
       <div class="info">
         <div class="btn-group">
           <!-- <button id="replay" class="btn">Replay last day</button> -->
-          <button id="heat" class="btn">Replay last 24 hours</button>
-          <button id="now" class="btn active">Now</button>
+          <button id="heat" class="btn active">Replay last 24 hours</button>
+          <button id="now" class="btn">Now</button>
         </div>
       </div>
     </div>
@@ -132,7 +132,7 @@
         var buses = {};
         var ref = new Firebase("https://publicdata-transit.firebaseio.com/");
         var system = 0;
-        var now = true;
+        var now = false;
         var name = transitSystems[system].tag;
         var styles = [{"featureType":"landscape","stylers":[{"saturation":-100},{"lightness":65},{"visibility":"on"}]},{"featureType":"poi","stylers":[{"saturation":-100},{"lightness":51},{"visibility":"simplified"}]},{"featureType":"road.highway","stylers":[{"saturation":-100},{"visibility":"simplified"}]},{"featureType":"road.arterial","stylers":[{"saturation":-100},{"lightness":30},{"visibility":"on"}]},{"featureType":"road.local","stylers":[{"saturation":-100},{"lightness":40},{"visibility":"on"}]},{"featureType":"transit","stylers":[{"saturation":-100},{"visibility":"simplified"}]},{"featureType":"administrative.province","stylers":[{"visibility":"off"}]},{"featureType":"water","elementType":"labels","stylers":[{"visibility":"on"},{"lightness":-25},{"saturation":-100}]},{"featureType":"water","elementType":"geometry","stylers":[{"hue":"#ffff00"},{"lightness":-25},{"saturation":-97}]}];
         var styledMap = new google.maps.StyledMapType(styles,
@@ -249,7 +249,6 @@
             $('#heat').removeClass('active');
             $('#replay').addClass('active');
             now = false;
-            heat = false;
             iconLayer.setCartoCSS(iconStyle);
 
             var shader = iconLayer.renderer._shader;
@@ -291,7 +290,6 @@
             $('#replay').removeClass('active');
             $('#heat').addClass('active');
             now = false;
-            heat = true;
             iconLayer.setCartoCSS(heatStyle);
             $('.cartodb-timeslider').show();
             numSteps = 1079;
@@ -309,7 +307,6 @@
           $('#heat').removeClass('active');
           $('#now').addClass('active');
           now = true;
-          heat = false;
           if (iconLayer) {
             iconLayer.pause();
             iconLayer.hide();
@@ -336,11 +333,14 @@
         .addTo(map, 0)
         .done(function (_layer) {
           iconLayer = _layer;
-          iconLayer.hide();
-          iconLayer.pause();
-          $('.cartodb-timeslider').hide();
+          // iconLayer.hide();
+          // iconLayer.pause();
+          // $('.cartodb-timeslider').hide();
           iconLayer.on('change:time', function (changes) {
             if (now) return;
+            if (changes.time.toString() !== "[object Date]") {
+              return;
+            }
             var ts = new Date(changes.time).valueOf();
             $('#time').text(getRelativeTime(ts));
             // if (changes.step === numSteps) {
@@ -353,7 +353,7 @@
             } else {
               $('.cartodb-timeslider .button').addClass('stop').removeClass('play');
             }
-          })
+          });
         });
 
         f = ref.child(name + "/vehicles");
