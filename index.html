@@ -338,7 +338,8 @@
           // $('.cartodb-timeslider').hide();
           iconLayer.on('change:time', function (changes) {
             if (now) return;
-            if (changes.time.toString() === 'Invalid Date') {
+            if (changes.time.toString() === 'Invalid Date' ||
+                changes.time.toString() === '0') {
               return;
             }
             var ts = new Date(changes.time).valueOf();
